@@ -151,10 +151,11 @@ The processor has been verified using a comprehensive ISA test suite covering al
 
 ## 📚 References
 
-- [RISC-V Instruction Set Manual](https://riscv.org/technical/specifications/)
-- Computer Architecture: A Quantitative Approach (Hennessy & Patterson)
-- Digital Design and Computer Architecture (Harris & Harris)
+- D. A. Patterson and J. L. Hennessy, Computer Organization and Design: The Hardware/Software Interface, RISC-V Edition, Morgan Kaufmann, 2020.
+- S. L. Harris and D. Harris, Digital Design  and Computer Architecture: RISC-V Edition,  Morgan Kaufmann, 2021.
+- Dan Garcia, "Pipeline I", Great Ideas in Computer Architecture (Machine Structures), University of California, Berkeley, 2020.
+- Dan Garcia, " Pipeline II: Control Hazards, Data Hazards I", Great Ideas in Computer Architecture (Machine Structures), University of California, Berkeley, 2020.
+- Dan Garcia, " Pipeline III: More Hazards, Superscalar Processors", Great Ideas in Computer Architecture (Machine Structures), University of California, Berkeley, 2020.
 
 ---
 
-*Last updated: [Date]*

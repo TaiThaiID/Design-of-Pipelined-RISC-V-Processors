@@ -1,0 +1,305 @@
+# ==============================================================================================
+# HEX/DEC Converter Application for RISC-V Single-Cycle Processor
+# ==============================================================================================
+# Description:
+#   - Reads a 12-bit value from switches SW[11:0]
+#   - Displays the value in both DECIMAL (HEX0-3) and HEXADECIMAL (HEX4-7) on 7-segment displays
+#   - SW[12]: Master enable (1=display, 0=clear all)
+#   - SW[13]: DEC display enable (1=show, 0=hide HEX0-3)
+#   - SW[14]: HEX display enable (1=show, 0=hide HEX4-7)
+#   - Red LEDs always show SW[14:0] regardless of enable state
+#
+# Memory Map:
+#   SW_BASE   = 0x10010000  (Switch input register)
+#   LEDR_BASE = 0x10000000  (Red LED output register)
+#   HEX_LO    = 0x10002000  (7-segment displays HEX0-3)
+#   HEX_HI    = 0x10003000  (7-segment displays HEX4-7)
+# ==============================================================================================
+
+_start:
+    # ===== Initialize Base Addresses =====
+    lui     s11, 0x10010       # s11 = 0x10010000 (Switch base address)
+    lui     t4, 0x10002        # t4  = 0x10002000 (HEX_LO: 7-seg displays 0-3)
+    lui     t5, 0x10003        # t5  = 0x10003000 (HEX_HI: 7-seg displays 4-7)
+    lui     s9, 0x10000        # s9  = 0x10000000 (Red LED base address)
+
+
+main_loop:
+    # ===== Read Switch Values =====
+    lw      s8, 0(s11)         # s8 = 32-bit switch value
+
+    # ===== Update Red LEDs with SW[14:0] (Always Active) =====
+    # Extract lower 15 bits and display on red LEDs
+    addi    s10, s8, 0         # Copy switch value to s10
+    slli    s10, s10, 17       # Shift left 17 bits to clear upper bits
+    srli    s10, s10, 17       # Shift right 17 bits to isolate SW[14:0]
+    sw      s10, 0(s9)         # Write to LEDR register
+
+    # ===== Check Master Enable Bit (SW[12]) =====
+    srli    t6, s8, 12         # Shift right to get SW[12]
+    andi    t6, t6, 1          # Mask to get only bit 12: t6 = SW[12] (0 or 1)
+
+    beq     t6, x0, disabled   # If enable == 0, jump to disabled state
+
+    # ===== Extract 12-bit Input Value (SW[11:0]) =====
+    addi    t1, s8, 0          # Copy switch value
+    slli    t1, t1, 20         # Shift left 20 bits to clear upper 20 bits
+    srli    t1, t1, 20         # Shift right 20 bits to get SW[11:0]
+                               # Note: Using shift instead of 'andi t1, s8, 0xFFF' 
+                               # because Venus simulator doesn't support large immediates well
+
+    # ===== Initialize 7-Segment Display Registers =====
+    # Set all displays to blank (0xFF = all segments off)
+    addi    s0, x0, 0xFF       # HEX0 = blank
+    addi    s1, x0, 0xFF       # HEX1 = blank
+    addi    s2, x0, 0xFF       # HEX2 = blank
+    addi    s3, x0, 0xFF       # HEX3 = blank
+    addi    s4, x0, 0xFF       # HEX4 = blank
+    addi    s5, x0, 0xFF       # HEX5 = blank
+    addi    s6, x0, 0xFF       # HEX6 = blank
+    addi    s7, x0, 0xFF       # HEX7 = blank
+
+
+    # =================== DECIMAL CONVERSION (HEX0-3) ===================
+    # Convert the 12-bit value to decimal and display on HEX0-3
+    addi    t2, t1, 0          # t2 = input value (n)
+    beq     t2, x0, dec_is_zero # If n == 0, handle special case
+
+    addi    t3, x0, 4          # t3 = 4 (maximum decimal digits to display)
+    addi    a3, x0, 0          # a3 = digit counter (0-3 for HEX0-3)
+
+dec_loop:
+    beq     t2, x0, done_dec   # If n == 0, finished conversion
+    beq     a3, t3, done_dec   # If 4 digits processed, done
+
+    # ----- Integer Division by 10 (Using Repeated Subtraction) -----
+    # Calculate: quotient = n / 10, remainder = n % 10
+    addi    a0, t2, 0          # a0 = dividend (n)
+    addi    a1, x0, 0          # a1 = quotient = 0
+    addi    a2, x0, 10         # a2 = divisor = 10
+div10_dec:
+    bltu    a0, a2, enddiv_dec # If dividend < 10, division complete
+    addi    a0, a0, -10        # dividend -= 10
+    addi    a1, a1, 1          # quotient += 1
+    jal     x0, div10_dec      # Loop back
+enddiv_dec:
+    # Now: a0 = remainder (0-9), a1 = quotient
+
+    # ----- Map Digit (0-9) to 7-Segment Code -----
+    jal     ra, map_hex_digit  # Call mapping function, result in a0
+
+    # ----- Store 7-Segment Code in Appropriate Register (s0-s3) -----
+    addi    a4, x0, 0          # Check digit position
+    beq     a3, a4, st_dec0    # If position 0, store to s0 (HEX0)
+    addi    a4, x0, 1
+    beq     a3, a4, st_dec1    # If position 1, store to s1 (HEX1)
+    addi    a4, x0, 2
+    beq     a3, a4, st_dec2    # If position 2, store to s2 (HEX2)
+    addi    a4, x0, 3
+    beq     a3, a4, st_dec3    # If position 3, store to s3 (HEX3)
+    jal     x0, after_store_dec
+
+st_dec0: 
+    addi s0, a0, 0             # HEX0 = 7-segment code
+    jal x0, after_store_dec
+st_dec1: 
+    addi s1, a0, 0             # HEX1 = 7-segment code
+    jal x0, after_store_dec
+st_dec2: 
+    addi s2, a0, 0             # HEX2 = 7-segment code
+    jal x0, after_store_dec
+st_dec3: 
+    addi s3, a0, 0             # HEX3 = 7-segment code
+    jal x0,  after_store_dec
+
+after_store_dec:
+    addi    a3, a3, 1          # Increment digit counter
+    addi    t2, a1, 0          # n = quotient (for next iteration)
+    jal     x0, dec_loop       # Continue loop
+
+dec_is_zero:
+    # Special case: if input is 0, display '0' on HEX0
+    addi    s0, x0, 0xC0       # 7-segment code for '0'
+    addi    a3, x0, 1          # Set digit counter to 1
+
+done_dec:
+    # =================== HEXADECIMAL CONVERSION (HEX4-7) ===================
+    # Display the 12-bit value as hexadecimal on HEX4-7
+    
+    # ----- HEX4: Display lowest 4 bits (bits 3-0) -----
+    andi    a0, t1, 0xF        # Extract bits [3:0]
+    jal     ra, map_hex_digit  # Convert to 7-segment code
+    addi    s4, a0, 0          # Store to HEX4
+
+    # ----- HEX5: Display bits 7-4 -----
+    srli    t6, t1, 4          # Shift right 4 bits
+    andi    a0, t6, 0xF        # Extract bits [3:0] (originally bits [7:4])
+    jal     ra, map_hex_digit  # Convert to 7-segment code
+    addi    s5, a0, 0          # Store to HEX5
+
+    # ----- HEX6: Display bits 11-8 -----
+    srli    t6, t1, 8          # Shift right 8 bits
+    andi    a0, t6, 0xF        # Extract bits [3:0] (originally bits [11:8])
+    jal     ra, map_hex_digit  # Convert to 7-segment code
+    addi    s6, a0, 0          # Store to HEX6
+
+    # ----- HEX7: Display bits 15-12 -----
+    # (Should be 0 for 12-bit input, but kept for completeness)
+    srli    t6, t1, 12         # Shift right 12 bits
+    andi    a0, t6, 0xF        # Extract bits [3:0] (originally bits [15:12])
+    jal     ra, map_hex_digit  # Convert to 7-segment code
+    addi    s7, a0, 0          # Store to HEX7
+
+    # =================== PACK AND WRITE TO HARDWARE ===================
+pack_and_write:
+    # ----- Pack HEX0-3 into 32-bit word (word_lo) -----
+    # Format: [HEX3][reserved][HEX2][reserved][HEX1][reserved][HEX0][reserved]
+    slli    t1, s3, 24         # HEX3 in bits [31:24]
+    slli    t2, s2, 16         # HEX2 in bits [23:16]
+    or      t1, t1, t2         # Combine HEX3 and HEX2
+    slli    t2, s1, 8          # HEX1 in bits [15:8]
+    or      t1, t1, t2         # Combine with HEX1
+    or      t1, t1, s0         # Combine with HEX0 in bits [7:0]
+
+    # ----- Pack HEX4-7 into 32-bit word (word_hi) -----
+    # Format: [HEX7][reserved][HEX6][reserved][HEX5][reserved][HEX4][reserved]
+    slli    t2, s7, 24         # HEX7 in bits [31:24]
+    slli    t3, s6, 16         # HEX6 in bits [23:16]
+    or      t2, t2, t3         # Combine HEX7 and HEX6
+    slli    t3, s5, 8          # HEX5 in bits [15:8]
+    or      t2, t2, t3         # Combine with HEX5
+    or      t2, t2, s4         # Combine with HEX4 in bits [7:0]
+
+    # ===== Check Individual Display Enable Bits =====
+    
+    # ----- Check SW[14] (HEX display enable) -----
+    srli    t6, s8, 14         # Get bit SW[14]
+    andi    t6, t6, 1          # Mask to get only bit 14
+    bne     t6, x0, write_hex  # If SW[14] == 1, keep HEX4-7 enabled
+    li      t2, 0xFFFFFFFF     # If SW[14] == 0, blank HEX4-7 (all segments off)
+
+write_hex:
+    # ----- Check SW[13] (DEC display enable) -----
+    srli    t6, s8, 13         # Get bit SW[13]
+    andi    t6, t6, 1          # Mask to get only bit 13
+    bne     t6, x0, write_dec  # If SW[13] == 1, keep HEX0-3 enabled
+    li      t1, 0xFFFFFFFF     # If SW[13] == 0, blank HEX0-3 (all segments off)
+
+write_dec:
+    # ----- Write to 7-Segment Display Registers -----
+    sw      t1, 0(t4)          # Write word_lo to HEX_LO (HEX0-3)
+    sw      t2, 0(t5)          # Write word_hi to HEX_HI (HEX4-7)
+
+    jal     x0, main_loop      # Loop back to read switches again
+
+# ===== Disabled State: Clear All 7-Segment Displays =====
+disabled:
+    li      t1, 0xFFFFFFFF     # Load blank pattern (all segments off)
+    sw      t1, 0(t4)          # Clear HEX0-3
+    sw      t1, 0(t5)          # Clear HEX4-7
+    jal     x0, main_loop      # Loop back to main
+
+
+# ==============================================================================================
+# Subroutine: map_hex_digit
+# ==============================================================================================
+# Description: Maps a hexadecimal digit (0-F) to its 7-segment display code
+# Input:  a0 = digit value (0-15)
+# Output: a0 = 7-segment code (active-low, 0=on, 1=off)
+# Uses:   t0 (temporary for comparison)
+# ==============================================================================================
+map_hex_digit:
+    # ----- Check digit value and jump to appropriate code -----
+    addi    t0, x0, 0
+    beq     a0, t0, md0        # If digit == 0
+    addi    t0, x0, 1
+    beq     a0, t0, md1        # If digit == 1
+    addi    t0, x0, 2
+    beq     a0, t0, md2        # If digit == 2
+    addi    t0, x0, 3
+    beq     a0, t0, md3        # If digit == 3
+    addi    t0, x0, 4
+    beq     a0, t0, md4        # If digit == 4
+    addi    t0, x0, 5
+    beq     a0, t0, md5        # If digit == 5
+    addi    t0, x0, 6
+    beq     a0, t0, md6        # If digit == 6
+    addi    t0, x0, 7
+    beq     a0, t0, md7        # If digit == 7
+    addi    t0, x0, 8
+    beq     a0, t0, md8        # If digit == 8
+    addi    t0, x0, 9
+    beq     a0, t0, md9        # If digit == 9
+    addi    t0, x0, 10
+    beq     a0, t0, mdA        # If digit == A
+    addi    t0, x0, 11
+    beq     a0, t0, mdB        # If digit == B
+    addi    t0, x0, 12
+    beq     a0, t0, mdC        # If digit == C
+    addi    t0, x0, 13
+    beq     a0, t0, mdD        # If digit == D
+    addi    t0, x0, 14
+    beq     a0, t0, mdE        # If digit == E
+    addi    t0, x0, 15
+    beq     a0, t0, mdF        # If digit == F
+
+    # Default case: invalid digit
+    addi    a0, x0, 0x00       # Return 0x00 (all segments on) for invalid input
+    jalr    x0, ra, 0          # Return
+
+# ----- 7-Segment Codes (Active-Low: 0=segment on, 1=segment off) -----
+# Segment layout:  a
+#                 f b
+#                  g
+#                 e c
+#                  d
+# Bit order: [dp g f e d c b a] (bit 7 not used for decimal point)
+
+md0: 
+    addi a0, x0, 0xC0          # '0': segments a,b,c,d,e,f on
+    jalr x0, ra, 0
+md1: 
+    addi a0, x0, 0xF9          # '1': segments b,c on
+    jalr x0, ra, 0
+md2: 
+    addi a0, x0, 0xA4          # '2': segments a,b,d,e,g on
+    jalr x0, ra, 0
+md3: 
+    addi a0, x0, 0xB0          # '3': segments a,b,c,d,g on
+    jalr x0, ra, 0
+md4: 
+    addi a0, x0, 0x99          # '4': segments b,c,f,g on
+    jalr x0, ra, 0
+md5: 
+    addi a0, x0, 0x92          # '5': segments a,c,d,f,g on
+    jalr x0, ra, 0
+md6: 
+    addi a0, x0, 0x82          # '6': segments a,c,d,e,f,g on
+    jalr x0, ra, 0
+md7: 
+    addi a0, x0, 0xF8          # '7': segments a,b,c on
+    jalr x0, ra, 0
+md8: 
+    addi a0, x0, 0x80          # '8': all segments on
+    jalr x0, ra, 0
+md9: 
+    addi a0, x0, 0x90          # '9': segments a,b,c,d,f,g on
+    jalr x0, ra, 0
+mdA: 
+    addi a0, x0, 0x88          # 'A': segments a,b,c,e,f,g on
+    jalr x0, ra, 0
+mdB: 
+    addi a0, x0, 0x83          # 'b': segments c,d,e,f,g on
+    jalr x0, ra, 0
+mdC: 
+    addi a0, x0, 0xC6          # 'C': segments a,d,e,f on
+    jalr x0, ra, 0
+mdD: 
+    addi a0, x0, 0xA1          # 'd': segments b,c,d,e,g on
+    jalr x0, ra, 0
+mdE: 
+    addi a0, x0, 0x86          # 'E': segments a,d,e,f,g on
+    jalr x0, ra, 0
+mdF: 
+    addi a0, x0, 0x8E          # 'F': segments a,e,f,g on
+    jalr x0, ra, 0

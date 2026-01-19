@@ -145,6 +145,7 @@ The processor has been verified using a comprehensive ISA test suite covering al
 - Real-time instruction execution
 
 ### Hardware Demo
+<img width="1307" height="875" alt="image" src="https://github.com/user-attachments/assets/e99fb815-d6b4-4936-a848-174130f21e8e" />
 
 
 ---

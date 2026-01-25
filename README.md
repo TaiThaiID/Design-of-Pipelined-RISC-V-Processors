@@ -2,7 +2,7 @@
 
 A 5-stage pipelined RISC-V processor implementation supporting the RV32I instruction set architecture, featuring hazard detection and data forwarding mechanisms.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
@@ -15,21 +15,21 @@ A 5-stage pipelined RISC-V processor implementation supporting the RV32I instruc
 
 ---
 
-## 🎯 Overview
+## Overview
 
 This project implements a **5-stage pipelined RISC-V processor** based on the **RV32I** instruction set architecture. The design focuses on understanding pipeline hazards and implementing solutions through hazard detection and data forwarding techniques. Two distinct models were developed to compare performance trade-offs between different hazard handling strategies.
 
 **Key Highlights:**
-- ✅ Complete RV32I ISA support (40+ instructions)
-- ✅ 5-stage pipeline architecture
-- ✅ Comprehensive hazard detection unit
-- ✅ Data forwarding mechanism
-- ✅ Memory-mapped I/O system
-- ✅ Verified with automated ISA test suite
+- Complete RV32I ISA support (40+ instructions)
+- 5-stage pipeline architecture
+- Comprehensive hazard detection unit
+- Data forwarding mechanism
+- Memory-mapped I/O system
+- Verified with automated ISA test suite
 
 ---
 
-## ✨ Features
+## Features
 
 ### Instruction Set Support
 The processor supports the complete RV32I base integer instruction set:
@@ -53,7 +53,7 @@ The processor supports the complete RV32I base integer instruction set:
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Pipeline Stages
 
@@ -75,7 +75,7 @@ The processor implements a classic 5-stage pipeline:
 
 ---
 
-## 🔧 Implementation Models
+## Implementation Models
 
 Two pipeline models were implemented to demonstrate different approaches to handling data hazards:
 
@@ -109,7 +109,7 @@ Two pipeline models were implemented to demonstrate different approaches to hand
 
 ---
 
-## 📊 Performance Results
+## Performance Results
 
 Performance comparison between the two implemented models:
 
@@ -127,7 +127,7 @@ Performance comparison between the two implemented models:
 - Performance gain primarily from reduced data hazard stalls
 ---
 
-## ✅ Verification
+## Verification
 
 The processor has been verified using a comprehensive ISA test suite covering all RV32I instructions.
 
@@ -150,7 +150,7 @@ The processor has been verified using a comprehensive ISA test suite covering al
 
 ---
 
-## 📚 References
+## References
 
 - D. A. Patterson and J. L. Hennessy, Computer Organization and Design: The Hardware/Software Interface, RISC-V Edition, Morgan Kaufmann, 2020.
 - S. L. Harris and D. Harris, Digital Design  and Computer Architecture: RISC-V Edition,  Morgan Kaufmann, 2021.
